@@ -1264,7 +1264,7 @@ export class JsonSchemaGenerator {
             if (this.args.uniqueNames && reffedType) {
                 const sourceFile = getSourceFile(reffedType);
                 const relativePath = path.relative(process.cwd(), sourceFile.fileName);
-                fullTypeName = `${typeName}.${generateHashOfNode(getCanonicalDeclaration(reffedType!), relativePath)}`;
+                fullTypeName = `${typeName}.${generateHashOfNode(relativePath)}`;
             } else {
                 fullTypeName = this.makeTypeNameUnique(typ, typeName);
             }
@@ -1274,10 +1274,7 @@ export class JsonSchemaGenerator {
                 const sym = typ.symbol;
                 const sourceFile = getSourceFile(sym);
                 const relativePath = path.relative(process.cwd(), sourceFile.fileName);
-                fullTypeName = `${this.getTypeName(typ)}.${generateHashOfNode(
-                    getCanonicalDeclaration(sym),
-                    relativePath
-                )}`;
+                fullTypeName = `${this.getTypeName(typ)}.${generateHashOfNode(relativePath)}`;
             } else if (reffedType && this.schemaOverrides.has(reffedType.escapedName as string)) {
                 fullTypeName = reffedType.escapedName as string;
             } else {
@@ -1298,7 +1295,7 @@ export class JsonSchemaGenerator {
             // We don't return the full definition, but we put it into
             // reffedDefinitions below.
             returnedDefinition = {
-                $ref: `${this.args.id}#/definitions/` + fullTypeName,
+                $ref: `${this.args.id}#/definitions/` + fullTypeName.substring(0, fullTypeName.indexOf(".")),
             };
         }
 
@@ -1316,7 +1313,7 @@ export class JsonSchemaGenerator {
 
         // Create the actual definition only if is an inline definition, or
         // if it will be a $ref and it is not yet created
-        if (!asRef || !this.reffedDefinitions[fullTypeName]) {
+        if (!asRef || !this.reffedDefinitions[fullTypeName.substring(0, fullTypeName.indexOf("."))]) {
             if (asRef) {
                 // must be here to prevent recursivity problems
                 let reffedDefinition: Definition;
@@ -1325,9 +1322,9 @@ export class JsonSchemaGenerator {
                 } else {
                     reffedDefinition = definition;
                 }
-                this.reffedDefinitions[fullTypeName] = reffedDefinition;
+                this.reffedDefinitions[fullTypeName.substring(0, fullTypeName.indexOf("."))] = reffedDefinition;
                 if (this.args.titles && fullTypeName) {
-                    definition.title = fullTypeName;
+                    definition.title = fullTypeName.substring(0, fullTypeName.indexOf("."));
                 }
             }
             const node = symbol?.getDeclarations() !== undefined ? symbol.getDeclarations()![0] : null;
@@ -1386,10 +1383,10 @@ export class JsonSchemaGenerator {
             }
         }
 
-        if (this.recursiveTypeRef.get(fullTypeName) === definition) {
-            this.recursiveTypeRef.delete(fullTypeName);
+        if (this.recursiveTypeRef.get(fullTypeName.substring(0, fullTypeName.indexOf("."))) === definition) {
+            this.recursiveTypeRef.delete(fullTypeName.substring(0, fullTypeName.indexOf(".")));
             // If the type was recursive (there is reffedDefinitions) - lets replace it to reference
-            if (this.reffedDefinitions[fullTypeName]) {
+            if (this.reffedDefinitions[fullTypeName.substring(0, fullTypeName.indexOf("."))]) {
                 const annotations = Object.entries(returnedDefinition).reduce((acc, [key, value]) => {
                     if (annotationKeywords[key] && typeof value !== undefined) {
                         acc[key] = value;
@@ -1398,7 +1395,7 @@ export class JsonSchemaGenerator {
                 }, {});
 
                 returnedDefinition = {
-                    $ref: `${this.args.id}#/definitions/` + fullTypeName,
+                    $ref: `${this.args.id}#/definitions/` + fullTypeName.substring(0, fullTypeName.indexOf(".")),
                     ...annotations,
                 };
             }
@@ -1532,8 +1529,8 @@ export function getProgramFromFiles(
     return ts.createProgram(files, options);
 }
 
-function generateHashOfNode(node: ts.Node, relativePath: string): string {
-    return createHash("md5").update(relativePath).update(node.pos.toString()).digest("hex").substring(0, 8);
+function generateHashOfNode(relativePath: string): string {
+    return createHash("md5").update(relativePath).digest("hex").substring(0, 8);
 }
 
 export function buildGenerator(
@@ -1589,7 +1586,7 @@ export function buildGenerator(
                     const nodeType = tc.getTypeAtLocation(node);
                     const fullyQualifiedName = tc.getFullyQualifiedName(symbol);
                     const typeName = fullyQualifiedName.replace(/".*"\./, "");
-                    const name = !args.uniqueNames ? typeName : `${typeName}.${generateHashOfNode(node, relativePath)}`;
+                    const name = !args.uniqueNames ? typeName : `${typeName}.${generateHashOfNode(relativePath)}`;
 
                     symbols.push({ name, typeName, fullyQualifiedName, symbol });
                     if (!userSymbols[name]) {
@@ -1715,7 +1712,7 @@ export async function exec(filePattern: string, fullTypeName: string, args = get
         onlyIncludeFiles = onlyIncludeFiles.map(normalizeFileName);
     }
 
-    const definition = generateSchema(program, fullTypeName, args, onlyIncludeFiles);
+    const definition = generateSchema(program, fullTypeName.substring(0, fullTypeName.indexOf(".")), args, onlyIncludeFiles);
     if (definition === null) {
         throw new Error("No output definition. Probably caused by errors prior to this?");
     }
