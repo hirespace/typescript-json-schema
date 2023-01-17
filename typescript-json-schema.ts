@@ -1284,10 +1284,10 @@ export class JsonSchemaGenerator {
 
         // Handle recursive types
         if (!isRawType || !!typ.aliasSymbol) {
-            if (this.recursiveTypeRef.has(fullTypeName)) {
+            if (this.recursiveTypeRef.has(fullTypeName.substring(0, fullTypeName.indexOf(".")))) {
                 asRef = true;
             } else {
-                this.recursiveTypeRef.set(fullTypeName, definition);
+                this.recursiveTypeRef.set(fullTypeName.substring(0, fullTypeName.indexOf(".")), definition);
             }
         }
 
@@ -1712,7 +1712,7 @@ export async function exec(filePattern: string, fullTypeName: string, args = get
         onlyIncludeFiles = onlyIncludeFiles.map(normalizeFileName);
     }
 
-    const definition = generateSchema(program, fullTypeName.substring(0, fullTypeName.indexOf(".")), args, onlyIncludeFiles);
+    const definition = generateSchema(program, fullTypeName, args, onlyIncludeFiles);
     if (definition === null) {
         throw new Error("No output definition. Probably caused by errors prior to this?");
     }
